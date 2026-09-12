@@ -1,0 +1,1 @@
+"""File tracking state. Implemented in Phase 8."""

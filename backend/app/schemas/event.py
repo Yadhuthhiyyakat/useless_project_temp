@@ -1,0 +1,1 @@
+"""File event schemas. Implemented in a later phase."""

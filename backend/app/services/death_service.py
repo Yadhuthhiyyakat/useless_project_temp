@@ -1,0 +1,1 @@
+"""Death creation service. Implemented in Phase 8."""

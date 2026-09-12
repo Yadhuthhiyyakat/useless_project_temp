@@ -1,0 +1,1 @@
+"""Watcher status schemas. Implemented in Phase 15."""
