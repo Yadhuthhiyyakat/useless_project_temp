@@ -102,14 +102,15 @@ def create_app(config: Config | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
-    if config.cors_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=config.cors_origins,
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+    cors_origins = config.cors_origins if config.cors_origins else ["*"]
+    allow_credentials = bool(config.cors_origins)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=allow_credentials,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
