@@ -141,3 +141,28 @@ def test_settings_affects_watcher_status(tmp_path) -> None:
         client.patch("/api/v1/settings", json={"watched_directories": [watched]})
         resp = client.get("/api/v1/watcher/status")
         assert watched in resp.json()["watched_directories"]
+
+
+def test_dynamic_directory_watch_and_death_recording(tmp_path) -> None:
+    test_dir = tmp_path / "live_watch_test"
+    test_dir.mkdir()
+    with _client(tmp_path) as client:
+        # User adds directory through settings API
+        resp = client.patch("/api/v1/settings", json={"watched_directories": [str(test_dir)]})
+        assert resp.status_code == 200
+
+        # Create file in newly watched directory
+        file_path = str(test_dir / "rip_file.txt")
+        (test_dir / "rip_file.txt").write_text("farewell")
+        time.sleep(0.4)
+
+        # Delete file in newly watched directory
+        (test_dir / "rip_file.txt").unlink()
+        time.sleep(0.6)
+
+        # Check death record was created and is queryable
+        deaths_resp = client.get("/api/v1/deaths")
+        assert deaths_resp.status_code == 200
+        items = deaths_resp.json()["items"]
+        assert len(items) >= 1
+        assert any(item["filename"] == "rip_file.txt" for item in items)

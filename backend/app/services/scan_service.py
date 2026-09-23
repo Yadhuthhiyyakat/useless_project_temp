@@ -96,22 +96,31 @@ class ScanService:
             return result
 
         logger.info("Scan start: %s (ignored: %s)", root, sorted(ignored))
-        with self.database.session() as session:
-            for dirpath, dirnames, filenames in os.walk(
-                root, followlinks=False, onerror=_walk_error_factory(result)
-            ):
-                dirnames[:] = [
-                    dirname
-                    for dirname in dirnames
-                    if not path_is_under_ignored(
-                        os.path.join(dirpath, dirname), ignored
-                    )
-                ]
+        file_paths: list[str] = []
+        for dirpath, dirnames, filenames in os.walk(
+            root, followlinks=False, onerror=_walk_error_factory(result)
+        ):
+            dirnames[:] = [
+                dirname
+                for dirname in dirnames
+                if not path_is_under_ignored(
+                    os.path.join(dirpath, dirname), ignored
+                )
+            ]
 
-                for name in sorted(filenames):
-                    path = os.path.abspath(os.path.join(dirpath, name))
-                    if path_is_under_ignored(path, ignored):
-                        continue
+            for name in sorted(filenames):
+                path = os.path.abspath(os.path.join(dirpath, name))
+                if path_is_under_ignored(path, ignored):
+                    continue
+                file_paths.append(path)
+
+        # Register files in batches so concurrent watcher events or HTTP requests
+        # are not blocked by a single prolonged SQLite transaction.
+        batch_size = 50
+        for i in range(0, len(file_paths), batch_size):
+            batch = file_paths[i : i + batch_size]
+            with self.database.session() as session:
+                for path in batch:
                     self._register_file(session, path, result)
 
         logger.info(

@@ -59,6 +59,36 @@ def create_app(config: Config | None = None) -> FastAPI:
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         logger.info("Digital Cemetery backend starting (version %s)", APP_VERSION)
         database.init()
+
+        from app.database.repositories import (
+            SETTING_AI_EPITAPHS_ENABLED,
+            SETTING_IGNORED_DIRECTORIES,
+            SETTING_WATCHED_DIRECTORIES,
+            SettingRepository,
+        )
+
+        with database.session() as session:
+            repo = SettingRepository(session)
+            db_watched = repo.get(SETTING_WATCHED_DIRECTORIES)
+            db_ignored = repo.get(SETTING_IGNORED_DIRECTORIES)
+            db_ai = repo.get(SETTING_AI_EPITAPHS_ENABLED)
+            if db_watched is not None:
+                config.watched_directories = db_watched
+            if db_ignored is not None:
+                config.ignored_directories = db_ignored
+            if db_ai is not None:
+                config.ai_epitaphs_enabled = db_ai
+
+        processor.update_directories(
+            watched_directories=config.watched_directories,
+            ignored_directories=config.ignored_directories,
+        )
+        for directory in config.watched_directories:
+            try:
+                watcher.add_directory(directory)
+            except WatcherError as exc:
+                logger.warning("Skipping configured directory: %s", exc)
+
         watcher.start()
         yield
         watcher.stop()

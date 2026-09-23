@@ -20,27 +20,34 @@ export default function GraveyardPage() {
   const filterTypeId = useId();
   const causeFilterId = useId();
 
-  // Load deaths strictly from live backend API
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await api.deaths.list({ limit: 100 });
-        if (res && Array.isArray(res.items)) {
-          setDeaths(res.items);
-        } else {
-          setDeaths([]);
-        }
-      } catch (e) {
-        console.error('Failed to load deaths from backend API:', e);
-        setError('Unable to reach the digital cemetery registry. Ensure the backend server is running.');
+  // Load deaths strictly from live backend API with auto-polling
+  async function loadData(showSpinner = false) {
+    try {
+      if (showSpinner) setLoading(true);
+      setError(null);
+      const res = await api.deaths.list({ limit: 100 });
+      if (res && Array.isArray(res.items)) {
+        setDeaths(res.items);
+      } else {
         setDeaths([]);
-      } finally {
-        setLoading(false);
       }
+    } catch (e) {
+      console.error('Failed to load deaths from backend API:', e);
+      if (showSpinner) {
+        setError('Unable to reach the digital cemetery registry. Ensure the backend server is running.');
+      }
+    } finally {
+      if (showSpinner) setLoading(false);
     }
-    loadData();
+  }
+
+  useEffect(() => {
+    loadData(true);
+    // Poll every 3 seconds so deletions appear on screen in real time
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   // Web Audio Synthesized Cathedral / Funeral Bell Chime
@@ -254,6 +261,15 @@ export default function GraveyardPage() {
             >
               <span>🌫️</span>
               <span>{fogActive ? 'Cemetery Mist: On' : 'Cemetery Mist: Off'}</span>
+            </button>
+
+            <button
+              onClick={() => loadData(false)}
+              className="px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition"
+              title="Refresh cemetery records"
+            >
+              <span>🔄</span>
+              <span>Refresh</span>
             </button>
           </div>
         </div>

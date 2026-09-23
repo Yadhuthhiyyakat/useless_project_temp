@@ -196,6 +196,19 @@ class DeathRepository:
         if existing is not None:
             return existing
 
+        # Dedup: If a death record for this exact path was created in the last 3 seconds, reuse it
+        stmt = (
+            select(Death)
+            .where(Death.original_path == original_path)
+            .order_by(Death.id.desc())
+            .limit(1)
+        )
+        recent_death = self.session.scalar(stmt)
+        if recent_death is not None and recent_death.deleted_at:
+            if abs((deleted_at - recent_death.deleted_at).total_seconds()) < 3.0:
+                file.is_alive = False
+                return recent_death
+
         death = Death(
             file_id=file.id,
             filename=filename,

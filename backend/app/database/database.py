@@ -29,7 +29,8 @@ def _configure_sqlite_connection(dbapi_connection, _connection_record) -> None:
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.execute("PRAGMA busy_timeout=30000")
+    cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.close()
 
 
@@ -54,14 +55,15 @@ class Database:
 
         if self._is_sqlite():
             # Watcher threads and FastAPI workers share sessions concurrently.
-            kwargs["connect_args"] = {"check_same_thread": False}
+            kwargs["connect_args"] = {"check_same_thread": False, "timeout": 30}
             if url.database == ":memory:":
                 kwargs["poolclass"] = StaticPool
-                kwargs["connect_args"] = {}
+                kwargs["connect_args"] = {"check_same_thread": False}
 
         engine = create_engine(url, **kwargs)
         if self._is_sqlite():
             event.listen(engine, "connect", _configure_sqlite_connection)
+
         return engine
 
     def init(self) -> None:

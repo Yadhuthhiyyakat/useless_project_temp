@@ -51,6 +51,21 @@ class EventProcessor:
         # Security roots: watched directories (resolved)
         self._roots = [os.path.abspath(d) for d in watched_directories if d]
 
+    def update_directories(
+        self,
+        *,
+        watched_directories: Iterable[str] | None = None,
+        ignored_directories: Iterable[str] | None = None,
+    ) -> None:
+        """Update active watched and ignored directories at runtime."""
+        if ignored_directories is not None:
+            self._ignored = {
+                os.path.abspath(path) for path in ignored_directories if path
+            }
+            self._ignored |= database_file_paths(self.database.config.database_url)
+        if watched_directories is not None:
+            self._roots = [os.path.abspath(d) for d in watched_directories if d]
+
     def is_ignored(self, path: str) -> bool:
         """True when a path is ignored or belongs to the backend's own database."""
         return path_is_under_ignored(os.path.abspath(path), self._ignored)

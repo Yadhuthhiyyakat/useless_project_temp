@@ -71,6 +71,15 @@ class FileEventHandler(FileSystemEventHandler):
         )
 
 
+def _is_subpath(child: str, parent: str) -> bool:
+    try:
+        c = Path(child).resolve()
+        p = Path(parent).resolve()
+        return c != p and p in c.parents
+    except Exception:
+        return False
+
+
 class WatcherService:
     """Owns a watchdog ``Observer`` watching multiple user directories."""
 
@@ -103,6 +112,23 @@ class WatcherService:
             raise WatcherError(f"Not an existing directory: {path}")
         if path in self._watched:
             return
+
+        # Check if already covered by an existing parent watch (which watches recursively)
+        for existing, watch in list(self._watched.items()):
+            if watch is not None and _is_subpath(path, existing):
+                self._watched[path] = None
+                logger.info("Directory %s is already monitored under %s", path, existing)
+                return
+
+        # If this path covers any existing sub-watches, unschedule them
+        for child, watch in list(self._watched.items()):
+            if watch is not None and _is_subpath(child, path):
+                try:
+                    self._observer.unschedule(watch)
+                except Exception:
+                    pass
+                self._watched[child] = None
+
         self._watched[path] = self._observer.schedule(
             self._handler, path, recursive=recursive
         )
@@ -113,8 +139,27 @@ class WatcherService:
         path = os.path.abspath(directory)
         watch = self._watched.pop(path, None)
         if watch is not None:
-            self._observer.unschedule(watch)
+            try:
+                self._observer.unschedule(watch)
+            except Exception:
+                pass
             logger.info("Stopped watching directory: %s", path)
+
+            # Re-activate any remaining directories that were previously covered by this parent
+            for child, child_watch in list(self._watched.items()):
+                if child_watch is None:
+                    still_covered = any(
+                        w is not None and _is_subpath(child, p)
+                        for p, w in self._watched.items()
+                    )
+                    if not still_covered and os.path.isdir(child):
+                        try:
+                            self._watched[child] = self._observer.schedule(
+                                self._handler, child, recursive=True
+                            )
+                            logger.info("Re-activated watch for directory: %s", child)
+                        except Exception as exc:
+                            logger.warning("Could not re-activate watch for %s: %s", child, exc)
 
     def start(self) -> None:
         """Start the observer thread. Idempotent."""
