@@ -29,6 +29,9 @@ def _parse_list(value: str | None) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+_DEFAULT_ENV = object()
+
+
 class Config:
     """Application configuration.
 
@@ -41,8 +44,11 @@ class Config:
         ignored_directories: Directories to always skip while monitoring.
     """
 
-    def __init__(self, env_file: str | Path | None = None) -> None:
-        load_dotenv(env_file or BASE_DIR / ".env")
+    def __init__(self, env_file: str | Path | None = _DEFAULT_ENV) -> None:
+        target_env = BASE_DIR / ".env" if env_file is _DEFAULT_ENV else env_file
+        if target_env is not None:
+            load_dotenv(target_env)
+
 
         self.database_url: str = os.getenv(
             "DATABASE_URL", f"sqlite:///{DEFAULT_DATABASE_PATH}"

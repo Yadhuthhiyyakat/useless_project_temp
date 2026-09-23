@@ -34,6 +34,7 @@ export default function RootLayout({ children }: LayoutProps) {
               </div>
               <ul className="flex items-center gap-6 text-sm">
                 <NavLink href="/">Dashboard</NavLink>
+                <NavLink href="/graveyard">🪦 Graveyard</NavLink>
                 <NavLink href="/deaths">All Deaths</NavLink>
                 <NavLink href="/statistics">Statistics</NavLink>
                 <NavLink href="/search">Search</NavLink>

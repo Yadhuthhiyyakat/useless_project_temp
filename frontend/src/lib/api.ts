@@ -126,10 +126,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   deaths: {
-    list: (params?: { limit?: number; offset?: number; cause?: string; extension?: string; q?: string }) =>
-      request<DeathListResponse>('/deaths', {
+    list: (params?: { limit?: number; offset?: number; cause?: string; extension?: string; q?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params) {
+        if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
+        if (params.offset !== undefined) searchParams.set('offset', String(params.offset));
+        if (params.cause) searchParams.set('cause', params.cause);
+        if (params.extension) searchParams.set('extension', params.extension);
+        if (params.q) searchParams.set('q', params.q);
+      }
+      const qs = searchParams.toString();
+      return request<DeathListResponse>(`/deaths${qs ? `?${qs}` : ''}`, {
         method: 'GET',
-      }),
+      });
+    },
 
     get: (id: number) => request<Death>(`/deaths/${id}`),
   },
